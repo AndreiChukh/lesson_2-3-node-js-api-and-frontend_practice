@@ -35,31 +35,48 @@ const message = document.querySelector<HTMLElement>('#message')!
 const reload = document.querySelector<HTMLButtonElement>('#reload')!
 const lists = document.querySelector<HTMLElement>('#lists')!
 const note = document.querySelector<HTMLElement>('#list-note')!
+
 let bookings: Booking[] = []
 let busy = false
 let loaded = false
+
 const allCards = new Map<string, BookingCard>()
 const confirmedCards = new Map<string, BookingCard>()
 
-// Готово: сохраняем экземпляры компонентов и передаём обновлённый объект в обе области.
 function sync(target: HTMLElement, cards: Map<string, BookingCard>, rows: Booking[]) {
   for (const [id, card] of cards) {
-    if (!rows.some(row => row.id === id)) { card.remove(); cards.delete(id) }
+    if (!rows.some(row => row.id === id)) {
+      card.remove()
+      cards.delete(id)
+    }
   }
+
   for (const booking of rows) {
     let card = cards.get(booking.id)
-    if (!card) { card = document.createElement('booking-card') as BookingCard; cards.set(booking.id, card) }
+
+    if (!card) {
+      card = document.createElement('booking-card') as BookingCard
+      cards.set(booking.id, card)
+    }
+
     card.booking = booking
     card.busy = busy
+
     if (card.parentElement !== target) target.append(card)
   }
 }
+
 function render() {
   sync(all, allCards, bookings)
   sync(confirmed, confirmedCards, bookings.filter(row => row.status === 'confirmed'))
-  document.querySelector('#total')!.textContent = String(bookings.reduce((sum, row) => sum + row.seats, 0))
+
+  document.querySelector('#total')!.textContent = String(
+    bookings.reduce((sum, row) => sum + row.seats, 0)
+  )
+
   document.querySelector('#count')!.textContent = String(bookings.length)
 }
+
 function setBusy(value: boolean) {
   busy = value
   fields.disabled = value || !loaded
@@ -67,73 +84,109 @@ function setBusy(value: boolean) {
   lists.setAttribute('aria-busy', String(value))
   render()
 }
+
 function showMessage(text: string, error = false) {
   message.textContent = text
   message.classList.toggle('error', error)
 }
 
-// Шаг 2 · LOAD: готовый путь ответа в карточки. Локального массива-запаски нет.
 async function loadBookings() {
   if (busy) return
+
   setBusy(true)
   showMessage('Загружаем список…')
+
   try {
     bookings = await getBookings()
     loaded = true
     note.textContent = bookings.length ? '' : 'Пока нет заявок.'
     showMessage('Список загружен.')
   } catch (error) {
-    note.textContent = loaded ? 'Показан последний загруженный список. Обновите после восстановления связи.' : 'Список ещё не загружен.'
-    showMessage(error instanceof Error ? error.message : 'Не удалось загрузить список.', true)
-  } finally { setBusy(false) }
+    note.textContent = loaded
+      ? 'Показан последний загруженный список. Обновите после восстановления связи.'
+      : 'Список ещё не загружен.'
+
+    showMessage(
+      error instanceof Error ? error.message : 'Не удалось загрузить список.',
+      true
+    )
+  } finally {
+    setBusy(false)
+  }
 }
-reload.addEventListener('click', () => { void loadBookings() })
+
+reload.addEventListener('click', () => {
+  void loadBookings()
+})
 
 form.addEventListener('submit', (event) => {
   event.preventDefault()
+
   if (!busy && loaded) void submitBooking()
 })
+
 async function submitBooking() {
   const data = new FormData(form)
   const name = String(data.get('name') ?? '').trim()
   const raw = String(data.get('seats') ?? '').trim()
   const seats = raw === '' ? NaN : Number(raw)
-  if (!name) { showMessage('Укажите непустое имя.', true); return }
-  if (!Number.isInteger(seats) || seats < 1 || seats > 5) {
-    showMessage('Введите целое число участников от 1 до 5.', true); return
+
+  if (!name) {
+    showMessage('Укажите непустое имя.', true)
+    return
   }
+
+  if (!Number.isInteger(seats) || seats < 1 || seats > 5) {
+    showMessage('Введите целое число участников от 1 до 5.', true)
+    return
+  }
+
   setBusy(true)
   showMessage('Сохраняем заявку…')
+
   try {
-    // Шаг 5 · SUBMIT: вместо заглушки дождитесь createBooking и добавьте ответ в массив.
-    // START SUBMIT
-    throw new Error('Шаг 5: подключите обработчик формы в src/main.ts.')
-    // END SUBMIT
+    const created = await createBooking({ name, seats })
+    bookings = [...bookings, created]
+
     form.reset()
     note.textContent = ''
     showMessage('Заявка добавлена.')
   } catch (error) {
-    // Шаг 11 · ERROR: при отказе ввод остаётся, карточка не добавляется.
-    showMessage(error instanceof Error ? error.message : 'Не удалось создать заявку.', true)
-  } finally { setBusy(false) }
+    showMessage(
+      error instanceof Error ? error.message : 'Не удалось создать заявку.',
+      true
+    )
+  } finally {
+    setBusy(false)
+  }
 }
 
 lists.addEventListener('booking-confirm', (event) => {
   if (!(event instanceof CustomEvent) || typeof event.detail?.id !== 'string' || busy) return
+
   if (!bookings.some(row => row.id === event.detail.id && row.status === 'new')) return
+
   void confirmFromCard(event.detail.id)
 })
+
 async function confirmFromCard(id: string) {
   setBusy(true)
   showMessage('Подтверждаем заявку…')
+
   try {
-    // Шаг 10 · CONFIRM: вызовите готовый API-клиент, замените запись ответом сервера.
     // START CONFIRM
     throw new Error('Шаг 10: подключите подтверждение в src/main.ts.')
     // END CONFIRM
+
     showMessage('Заявка подтверждена.')
   } catch (error) {
-    showMessage(error instanceof Error ? error.message : 'Не удалось подтвердить заявку.', true)
-  } finally { setBusy(false) }
+    showMessage(
+      error instanceof Error ? error.message : 'Не удалось подтвердить заявку.',
+      true
+    )
+  } finally {
+    setBusy(false)
+  }
 }
+
 void loadBookings()
