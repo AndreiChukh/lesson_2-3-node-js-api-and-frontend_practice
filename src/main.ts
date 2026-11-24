@@ -174,9 +174,8 @@ async function confirmFromCard(id: string) {
   showMessage('Подтверждаем заявку…')
 
   try {
-    // START CONFIRM
-    throw new Error('Шаг 10: подключите подтверждение в src/main.ts.')
-    // END CONFIRM
+    const updated = await confirmBooking(id)
+    bookings = bookings.map(row => row.id === id ? updated : row)
 
     showMessage('Заявка подтверждена.')
   } catch (error) {
